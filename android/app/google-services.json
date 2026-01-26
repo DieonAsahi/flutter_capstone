@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "914992580634",
+    "project_id": "stylo-7daf2",
+    "storage_bucket": "stylo-7daf2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914992580634:android:a86f920640e1b024d369a3",
+        "android_client_info": {
+          "package_name": "com.example.aplikasi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914992580634-gka9je8vli03r7ntc5ehopodan2otcs7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aplikasi",
+            "certificate_hash": "ac1c4e28bbf04bedccf765856945f367c6e73f96"
+          }
+        },
+        {
+          "client_id": "914992580634-77834aotj1k43rpmutfivbmj1qssc8oj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3sgpcUebbhx0hnLHBh1bOEtat6XBphkQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914992580634-77834aotj1k43rpmutfivbmj1qssc8oj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
