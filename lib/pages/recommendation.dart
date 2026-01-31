@@ -528,17 +528,34 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Widget _onlineProductCard(dynamic item) {
-    String img = item['image_url'].startsWith('http')
-        ? item['image_url']
-        : "${ApiConfig.baseUrl}/${item['image_url']}";
+    // 1. Ambil raw URL dari database
+    String rawUrl = item['image_url'] ?? '';
+
+    // 2. Logika Penentuan URL Gambar:
+    // Jika rawUrl diawali 'http', berarti itu link internet langsung (misal: Shopee).
+    // Jika tidak, berarti itu path relatif dari hasil upload Admin (misal: static/uploads/xxx.jpg),
+    // maka kita harus menggabungkannya dengan baseUrl dari ApiConfig.
+    String img = rawUrl.startsWith('http')
+        ? rawUrl
+        : "${ApiConfig.baseUrl}/$rawUrl";
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Bagian Gambar Produk
           Expanded(
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(
@@ -548,15 +565,45 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 img,
                 fit: BoxFit.cover,
                 width: double.infinity,
+                // Headers penting agar gambar bisa tembus jika kamu pakai Ngrok
+                headers: const {"ngrok-skip-browser-warning": "true"},
+                // Penanganan jika gambar gagal dimuat
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey.shade100,
+                    child: const Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.grey,
+                        size: 30,
+                      ),
+                    ),
+                  );
+                },
+                // Loading indicator saat gambar sedang didownload
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2,
+                    ),
+                  );
+                },
               ),
             ),
           ),
+          // Bagian Informasi Produk (Nama & Tombol Beli)
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item['item_name'] ?? 'Produk',
+                  item['item_name'] ?? 'Produk Tanpa Nama',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -567,18 +614,24 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 const SizedBox(height: 6),
                 SizedBox(
                   width: double.infinity,
-                  height: 28,
+                  height: 30,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      padding: EdgeInsets.zero,
                     ),
                     onPressed: () => _launchUrl(item['purchase_link']),
                     child: const Text(
                       "Beli",
-                      style: TextStyle(fontSize: 11, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

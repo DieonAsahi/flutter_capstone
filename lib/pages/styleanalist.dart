@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:aplikasi/services/api_config.dart';
+import 'package:url_launcher/url_launcher.dart'; // Pastikan sudah ditambah di pubspec.yaml
 
 class StylePage extends StatefulWidget {
   const StylePage({super.key});
@@ -17,9 +18,7 @@ class _StylePageState extends State<StylePage> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
 
-  // Default index 0 (Biasanya kamera belakang)
   int _selectedCameraIndex = 0;
-
   bool isCameraInitialized = false;
   bool isResult = false;
   bool isLoading = false;
@@ -35,7 +34,6 @@ class _StylePageState extends State<StylePage> {
   @override
   void initState() {
     super.initState();
-    // Cari kamera dulu, baru inisialisasi
     availableCameras().then((cameras) {
       _cameras = cameras;
       if (_cameras != null && _cameras!.isNotEmpty) {
@@ -54,46 +52,31 @@ class _StylePageState extends State<StylePage> {
 
   void _setupTTS() async {
     await _tts.setLanguage("id-ID");
-    await _tts.setPitch(1.0); // Pitch normal
+    await _tts.setPitch(1.0);
     await _tts.setSpeechRate(0.5);
   }
 
-  // --- PERBAIKAN INISIALISASI KAMERA ---
   Future<void> _initCamera(int index) async {
-    // 1. Matikan kamera lama jika ada (Mencegah stuck/memory leak)
     if (_cameraController != null) {
       await _cameraController!.dispose();
     }
-
     setState(() => isCameraInitialized = false);
-
     try {
       if (_cameras != null && _cameras!.isNotEmpty) {
-        // Cek validitas index
-        if (index < 0 || index >= _cameras!.length) return;
-
         _cameraController = CameraController(
           _cameras![index],
-          // GANTI KE HIGH AGAR TIDAK BURAM/GEPENG
           ResolutionPreset.high,
           enableAudio: false,
-          imageFormatGroup: Platform.isAndroid
-              ? ImageFormatGroup.jpeg
-              : ImageFormatGroup.bgra8888,
         );
-
         await _cameraController!.initialize();
-
-        // 2. MATIKAN FLASH SECARA PAKSA
         try {
           await _cameraController!.setFlashMode(FlashMode.off);
         } catch (e) {
           debugPrint("Flash tidak tersedia: $e");
         }
-
         if (mounted) {
           setState(() {
-            _selectedCameraIndex = index; // Update index agar swap berfungsi
+            _selectedCameraIndex = index;
             isCameraInitialized = true;
           });
         }
@@ -103,11 +86,8 @@ class _StylePageState extends State<StylePage> {
     }
   }
 
-  // --- PERBAIKAN LOGIKA SWAP ---
   void _onSwitchCamera() {
     if (_cameras == null || _cameras!.length < 2) return;
-
-    // Toggle index: Jika 0 jadi 1, Jika 1 jadi 0
     int newIndex = (_selectedCameraIndex == 0) ? 1 : 0;
     _initCamera(newIndex);
   }
@@ -115,13 +95,11 @@ class _StylePageState extends State<StylePage> {
   Future<void> _captureAndAnalyze() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized)
       return;
-
     setState(() {
       isLoading = true;
       isResult = false;
       isMaoReady = false;
     });
-
     try {
       final photo = await _cameraController!.takePicture();
       final imageFile = File(photo.path);
@@ -136,19 +114,15 @@ class _StylePageState extends State<StylePage> {
           .timeout(const Duration(seconds: 30));
 
       if (!mounted) return;
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['full_text'] != null) {
-          setState(() {
-            _capturedImage = imageFile;
-            analysisText = data['full_text'];
-            currentMotion = data['motion'] ?? "Idle";
-            isResult = true;
-          });
-        }
-      } else {
-        throw Exception("Server Error: ${response.statusCode}");
+        setState(() {
+          _capturedImage = imageFile;
+          analysisText = data['full_text'] ?? "";
+          currentMotion = data['motion'] ?? "Idle";
+          isResult = true;
+          isLoading = false;
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -176,7 +150,6 @@ class _StylePageState extends State<StylePage> {
                   setState(() {
                     isResult = false;
                     isLoading = false;
-                    // Re-init kamera saat kembali agar tidak freeze
                     _initCamera(_selectedCameraIndex);
                   });
                 },
@@ -229,8 +202,6 @@ class _StylePageState extends State<StylePage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: isCameraInitialized
-                      // Menggunakan CameraPreview langsung akan mengisi container
-                      // Aspect Ratio ditangani otomatis oleh widget ini
                       ? CameraPreview(_cameraController!)
                       : const Center(child: CircularProgressIndicator()),
                 ),
@@ -240,7 +211,7 @@ class _StylePageState extends State<StylePage> {
                 right: 15,
                 child: FloatingActionButton.small(
                   backgroundColor: Colors.white.withOpacity(0.5),
-                  onPressed: _onSwitchCamera, // Panggil fungsi switch baru
+                  onPressed: _onSwitchCamera,
                   child: const Icon(Icons.flip_camera_ios, color: Colors.black),
                 ),
               ),
@@ -274,10 +245,9 @@ class _StylePageState extends State<StylePage> {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Container Foto
           Container(
             width: double.infinity,
-            height: 350, // Diperbesar sedikit agar lebih jelas
+            height: 350,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.grey.shade200),
@@ -289,34 +259,50 @@ class _StylePageState extends State<StylePage> {
                   : const Icon(Icons.image, size: 50),
             ),
           ),
-
-          // Container WebView (Live2D) + Balon Chat
           Stack(
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
               Container(
-                height: 320,
+                height: 400,
                 width: double.infinity,
                 margin: const EdgeInsets.only(top: 40),
-                child: InAppWebView(
-                  initialUrlRequest: URLRequest(url: WebUri("${ApiConfig.baseUrl}/view")),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                ),
+                child: // Di dalam widget _buildResult()
+                InAppWebView(
+                  initialUrlRequest: URLRequest(
+                    url: WebUri("${ApiConfig.baseUrl}/view"),
+                    // TAMBAHKAN HEADERS DI SINI
+                    headers: {'ngrok-skip-browser-warning': 'true'},
+                  ),
                   initialSettings: InAppWebViewSettings(
+                    javaScriptEnabled: true,
                     transparentBackground: true,
+                    // Tambahkan pengaturan ini agar aset Live2D bisa dimuat
+                    allowFileAccessFromFileURLs: true,
+                    allowUniversalAccessFromFileURLs: true,
+                    mixedContentMode:
+                        MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
                   ),
                   onWebViewCreated: (c) => _webController = c,
                   onLoadStop: (c, u) async {
-                    await Future.delayed(const Duration(milliseconds: 1500));
+                    final cookieManager = CookieManager.instance();
+                    await cookieManager.setCookie(
+                      url: WebUri(ApiConfig.baseUrl),
+                      name: "ngrok-skip-browser-warning",
+                      value: "true",
+                      domain:
+                          "https://hireable-unelegant-linwood.ngrok-free.dev", // Sesuaikan dengan domain ngrok Anda
+                      isSecure: true,
+                    );
                     if (mounted) {
-                      setState(() {
-                        isLoading = false;
-                        isMaoReady = true;
-                      });
+                      setState(() => isMaoReady = true);
+                      // Tunggu PIXI selesai render
+                      await Future.delayed(const Duration(milliseconds: 2000));
                       _webController?.evaluateJavascript(
-                        source: "startLipSync()",
-                      );
-                      _webController?.evaluateJavascript(
-                        source: "triggerMotion('$currentMotion')",
+                        source: "changeMotion('$currentMotion')",
                       );
                       _tts.speak(analysisText);
                     }
@@ -325,7 +311,7 @@ class _StylePageState extends State<StylePage> {
               ),
               if (isMaoReady)
                 Positioned(
-                  top: -20, // Balon chat agak naik
+                  top: -20,
                   child: Column(
                     children: [
                       Container(
@@ -363,13 +349,35 @@ class _StylePageState extends State<StylePage> {
             ],
           ),
           const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final url = Uri.parse("${ApiConfig.baseUrl}/view");
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: const Icon(Icons.open_in_browser),
+            label: const Text("Buka di Chrome & Izinkan Ngrok"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              minimumSize: const Size(double.infinity, 48),
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: () => _webController?.reload(),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+            ),
+            child: const Text("Sudah Izinkan? Klik Refresh"),
+          ),
+          const SizedBox(height: 20),
           OutlinedButton(
             onPressed: () {
               _tts.stop();
               setState(() {
                 isResult = false;
                 isLoading = false;
-                // Re-init kamera saat kembali
                 _initCamera(_selectedCameraIndex);
               });
             },
